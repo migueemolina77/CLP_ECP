@@ -1,0 +1,1 @@
+Se realiza plantilla para visualizacion de datos .LAS
