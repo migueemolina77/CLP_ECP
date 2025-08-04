@@ -1,1 +1,5 @@
 streamlit
+pandas
+lasio
+matplotlib
+seaborn
