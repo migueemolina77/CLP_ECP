@@ -60,17 +60,19 @@ def extract_speed_from_filename(filename):
         return int(match.group(1))
     return None
 
-def detect_compania(las_file_content):
+def detect_compania(las_file_bytes):
     """
-    Lee las primeras líneas del archivo LAS para identificar la compañía.
+    Lee las primeras líneas de los bytes del archivo LAS para identificar la compañía.
+    Se espera una secuencia de bytes (bytes-like object) como entrada.
     """
     encodings_to_try = ['latin-1', 'utf-8', 'cp1252']
     header_content = ""
     
-    # Asume que las_file_content es un objeto de archivo en memoria.
-    # Lee las primeras 2048 bytes para detectar el encabezado.
-    content_to_check = las_file_content.read(2048)
-    las_file_content.seek(0) # Vuelve al inicio del archivo
+    # Crea un objeto BytesIO para simular un archivo en memoria
+    bytes_io = io.BytesIO(las_file_bytes)
+    
+    # Lee los primeros 2048 bytes para detectar el encabezado
+    content_to_check = bytes_io.read(2048)
     
     for encoding in encodings_to_try:
         try:
@@ -435,29 +437,30 @@ with tab2:
         file_name = uploaded_file_pbu.name
         las_data = None
         company = None
-        
-        # Rewind the file to the beginning to ensure lasio can read it
-        uploaded_file_pbu.seek(0)
+        temp_file_path = None
         
         try:
-            # Procesar el archivo subido
-            las_data = lasio.read(uploaded_file_pbu, encoding='latin-1')
+            # Crea un archivo temporal para procesar el archivo subido
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".las") as tmp_file:
+                tmp_file.write(uploaded_file_pbu.getvalue())
+                temp_file_path = tmp_file.name
+            
+            # Ahora, usa la ruta del archivo temporal para lasio.read(), lo cual es muy confiable
+            las_data = lasio.read(temp_file_path, encoding='latin-1')
             st.success(f"'{file_name}' cargado y procesado exitosamente.")
             
-            # Rewind the file again for the company detection
-            uploaded_file_pbu.seek(0)
-            
-            # Detectar compañía
-            company = detect_compania(uploaded_file_pbu)
+            # Detecta la compañía con el contenido binario del archivo
+            company = detect_compania(uploaded_file_pbu.getvalue())
             st.info(f"Compañía detectada: **{company}**")
 
         except Exception as e:
             st.error(f"Error al cargar o procesar el archivo: {e}")
             st.error("Es posible que el archivo esté corrupto o que el formato no sea compatible.")
+        finally:
+            if temp_file_path and os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
         
         if las_data and company:
-            # Ahora, toda la lógica de procesamiento y graficado de PBU
-            # está encapsulada aquí.
             df = las_data.df()
             
             st.write("Vista previa del DataFrame original:")
